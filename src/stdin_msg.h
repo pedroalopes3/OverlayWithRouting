@@ -12,3 +12,6 @@ void leave(node_s *node);
 void add_edge(node_s *node, const char *message);
 void show_neighbors(node_s *node);
 void remove_edge(node_s *node, int id);
+void announce(node_s* node);
+void show_routing(node_s *node, const char *message);
+void message_function(node_s *node, const char *message);

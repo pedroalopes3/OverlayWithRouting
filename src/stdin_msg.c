@@ -116,3 +116,77 @@ void remove_edge(node_s *node, int id)
     node->is_a_connected_neighbor[id] = false;
     node->n_neighbors--;
 }
+
+void announce(node_s *node)
+{
+
+    char route_message[256] = {0};
+    strcat(route_message, "ROUTE ");
+    strcat(route_message, node->id);
+    strcat(route_message, " 0\n");
+
+    int neighbors_seen = 0;
+    for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
+    {
+        if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
+        {
+            neighbors_seen++;
+
+            send_message_tcp(node->neighbors[i]->tcp_socket, route_message);
+        }
+    }
+}
+
+void show_routing(node_s *node, const char *message)
+{
+
+    char cmd[50] = {0};
+    char cmd2[50] = {0};
+    char dest[50] = {0};
+
+    if (sscanf(message, "%49s %49s %49s", cmd, cmd2, dest) == 3)
+    {
+        printf("Routing table for node %d:\n", atoi(dest));
+        printf("Destination\tState\n");
+
+        printf("%d\t\t%d\n", atoi(dest), node->state[atoi(dest)]);
+        if (node->state[atoi(dest)] == 0)
+        {
+            printf("Distance: %d, Successor: %d\n", node->dist[atoi(dest)], node->succ[atoi(dest)]);
+        }
+    }
+}
+
+void message_function(node_s *node, const char *message)
+{
+    char cmd[50] = {0};
+    char dest[50] = {0};
+    char msg_content[200] = {0};
+
+    // O nó origem origin envia ao nó destino dest a mensagem chat. A sequência
+    // de caracteres chat tem no máximo 128 caracteres.
+
+    if (sscanf(message, "%49s %49s %199[^\n]", cmd, dest, msg_content) == 3)
+    {
+        //printf("Processing 'message' command 1...\n");
+        int dest_id = atoi(dest);
+        if ((dest_id < 0 || dest_id >= 100 || node->state[dest_id] == 0) && dest_id != atoi(node->id) && node->succ[dest_id] == -1)
+        {
+            printf("Error: Invalid destination ID.\n");
+            return;
+        }
+        else if (node->state[dest_id] == 0)
+        {
+            char chat_message[256] = {0};
+            strcat(chat_message, "CHAT ");
+            strcat(chat_message, node->id);
+            strcat(chat_message, " ");
+            strcat(chat_message, dest);
+            strcat(chat_message, " ");
+            strcat(chat_message, msg_content);
+            strcat(chat_message, "\n");
+            send_message_tcp(node->neighbors[node->succ[dest_id]]->tcp_socket, chat_message);
+            return;
+        }
+    }
+}

@@ -14,23 +14,33 @@ void process_stdin_message(const char *message, node_s *node)
 {
     char first_word[50] = {0};
     char second_word[50] = {0};
+    char third_word[200] = {0};
 
-    if (sscanf(message, "%49s %49s", first_word, second_word) >= 1)
+    if (sscanf(message, "%49s %49s %199[^\n]", first_word, second_word, third_word) >= 1)
     {
         if ((strcmp(first_word, "join") == 0) || (strcmp(first_word, "j") == 0))
         {
             printf("Processing 'join' command...\n");
             join(node, message);
         }
+        if ((strcmp(first_word, "announce") == 0) || (strcmp(first_word, "a") == 0))
+        {
+            printf("Processing 'announce' command...\n");
+            announce(node);
+        }
         else if ((strcmp(first_word, "show") == 0) || (strcmp(first_word, "n") == 0) || (strcmp(first_word, "sg") == 0) || (strcmp(first_word, "sr") == 0))
         {
-            if ((strcmp(second_word, "nodes") == 0) || (strcmp(second_word, "n") == 0))
+            if ((strcmp(second_word, "nodes") == 0) || (strcmp(first_word, "n") == 0))
             {
                 show_nodes(node, message);
             }
-            else if (strcmp(second_word, "neighbors") == 0 || (strcmp(second_word, "sg") == 0))
+            else if (strcmp(second_word, "neighbors") == 0 || (strcmp(first_word, "sg") == 0))
             {
                 show_neighbors(node);
+            }
+            else if (strcmp(second_word, "routing") == 0 || (strcmp(first_word, "sr") == 0))
+            {
+                show_routing(node, message);
             }
         }
         else if ((strcmp(first_word, "leave") == 0) || (strcmp(first_word, "l") == 0))
@@ -56,12 +66,15 @@ void process_stdin_message(const char *message, node_s *node)
                     if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
                     {
                         neighbors_seen++;
-                        remove_edge(node,i);
+                        remove_edge(node, i);
                     }
                 }
                 leave(node);
             }
-            node->exiting = true;
+            if (node->left)
+            {
+                node->exiting = true;
+            }
         }
         else if ((strcmp(first_word, "add") == 0) || (strcmp(first_word, "ae") == 0))
         {
@@ -76,6 +89,19 @@ void process_stdin_message(const char *message, node_s *node)
             if (sscanf(message, "%49s %49s %49s", cmd, cmd2, id) == 3)
             {
                 remove_edge(node, atoi(id));
+            }
+        }
+        else if ((strcmp(first_word, "message") == 0) || (strcmp(first_word, "m") == 0))
+        {
+            if (strlen(third_word) > 129)
+            {
+                printf("Error: Message content exceeds maximum length of 129 characters.\n");
+                return;
+            }
+            else
+            {
+                printf("Processing 'message' command...\n");
+                message_function(node, message);
             }
         }
         else
@@ -149,6 +175,14 @@ void process_tcp_connection_message(node_s *node, int id)
             {
                 neighbor(node, received_message);
             }
+            else if (strcmp(first_word, "ROUTE") == 0)
+            {
+                route(node, received_message, id);
+            }
+            else if (strcmp(first_word, "CHAT") == 0)
+            {
+                chat(node, received_message, id);
+            }
             else
             {
                 printf("Received unknown message type: %s\n", first_word);
@@ -159,19 +193,24 @@ void process_tcp_connection_message(node_s *node, int id)
             printf("Error: Could not read any words from the string.\n");
         }
     }
-    else
+    else // se retornar NULL a conexão foi fechada
     {
-        if (node->receiving_neighbor)
+        if (node->receiving_neighbor) // caso estivesse no processo ainda de receber o vizinho
         {
             node->receiving_neighbor = false;
             node->tcp_connected_socket = -1;
         }
-        else
+        else // caso ja fosse um vizinho estabelecido
         {
+
+            // eliminar como vizinho
             node->n_neighbors--;
             node->is_a_connected_neighbor[id] = false;
             free_neighbor(node->neighbors[id]);
             node->neighbors[id] = NULL;
+
+            coordenation_after_loss(node, id);
+
         }
     }
 }

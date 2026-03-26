@@ -37,6 +37,7 @@ typedef struct
     bool exiting;     // in the process of exiting the program
     bool adding_edge; // in the process of adding an edge
     bool receiving_neighbor; // in the process of receiving a neighbor connection
+    bool loss_of_connection; // in the process of handling a loss of connection
 
     // neighbors
     int n_neighbors;              // number of neighbors
@@ -47,6 +48,19 @@ typedef struct
     int udp_socket;           // UDP socket to communicate with node servegvr
     int tcp_listening_socket; // TCP socket to listen for incoming connections from other nodes
     int tcp_connected_socket; // TCP socket for temporary befpre receiving the first message
+
+    
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+    //                                  Forwarding protocol
+    ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    int dist[100]; // distance to each neighbor (0-99)   (Unreachable = -1)
+    int succ[100]; // forwarding successor to get to in distance dist[neighbor] for each neighbor (0-99)  (Unreachable = -1)
+    int state[100]; // state relative to each neighbor (0-99)  (0 = expedition, 1 = coordenation)
+    int succ_coord[100]; // id of the neighbor that started the coordination state, if its by fail of the connection becomes -1
+    int coord[100][100]; // coord [t][j] - state relative to t, if j is on coordenation process 1 or not 0 
+
+
 } node_s;
 
 

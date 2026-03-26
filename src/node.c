@@ -30,6 +30,7 @@ node_s *create_node(char *ip, char *port, char *regIP, char *regUDP)
     node->exiting = false;
     node->adding_edge = false;
     node->receiving_neighbor = false;
+    node->loss_of_connection = false;
 
     srand(time(NULL));
     int numero = rand() % 1000;
@@ -59,6 +60,19 @@ node_s *create_node(char *ip, char *port, char *regIP, char *regUDP)
         node->neighbors[i] = NULL;
     }
 
+    // forwarding protocol initialization
+
+    for (int i = 0; i < 100; i++)
+    {
+        node->dist[i] = -1;
+        node->succ[i] = -1;
+        node->state[i] = 0;
+        node->succ_coord[i] = -1; 
+        for (int j = 0; j < 100; j++){
+            node->coord[i][j] = -1;
+        }
+    }
+
     return node;
 }
 
@@ -79,7 +93,7 @@ neighbor_s *create_neighbor(const char *id, const char *ip, const char *port)
         fprintf(stderr, "Error allocating memory for neighbor\n");
         return NULL;
     }
-    
+
     if (id != NULL)
     {
         strncpy(neighbor->id, id, sizeof(neighbor->id) - 1);

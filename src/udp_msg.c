@@ -57,6 +57,9 @@ void nodes(char *received_message, node_s *node)
             else
             {
                 printf("Error: My ID (%s) is already taken!\n", node->id);
+                node->joining = false;
+                node->net[0] = '\0';
+                node->id[0] = '\0';
                 // Handle collision (e.g., exit or ask the user for a new ID)
             }
         }
@@ -94,7 +97,23 @@ void reg(node_s *node, const char *received_message)
             printf("Unregistration successfully node ID %s from network %s\n", id, net);
             node->leaving = false;
             node->left = true;
-            node->exiting = true;
+            node->joined = false;
+            node->net[0] = '\0';
+            node->id[0] = '\0';
+        }
+        else if ((strcmp(op, "4") != 0) && (strcmp(op, "1") != 0) && (strcmp(op, "2") != 0))
+        {
+            printf("Received unknown REG message: %s\n", received_message);
+            if (node->joining)
+            {
+                node->joining = false;
+                node->net[0] = '\0';
+                node->id[0] = '\0';
+            }
+            else if (node->leaving)
+            {
+                node->leaving = false;
+            }
         }
     }
 }
@@ -114,18 +133,16 @@ void contact(node_s *node, const char *received_message)
     {
         if ((strcmp(op, "1") == 0) && (node->adding_edge))
         {
-            printf("The contact of node %s is ip:%s port:%s\n", id,ip,port);
+            printf("The contact of node %s is ip:%s port:%s\n", id, ip, port);
             char neighbor_message[256] = {0};
             strcat(neighbor_message, "NEIGHBOR ");
             strcat(neighbor_message, node->id);
             strcat(neighbor_message, "\n");
-            
 
-            
             int neighbor_idx = atoi(id);
             node->n_neighbors++;
             node->neighbors[neighbor_idx] = create_neighbor(id, ip, port);
-            node->neighbors[neighbor_idx]->tcp_socket = connect_and_send_tcp_client(ip, port, neighbor_message); 
+            node->neighbors[neighbor_idx]->tcp_socket = connect_and_send_tcp_client(ip, port, neighbor_message);
             node->is_a_connected_neighbor[neighbor_idx] = true;
             node->adding_edge = false;
         }
@@ -134,8 +151,9 @@ void contact(node_s *node, const char *received_message)
 
             printf("Node %s is not registered\n", id);
             node->adding_edge = false;
-
-        }else{
+        }
+        else
+        {
             printf("Received unknown CONTACT message: %s\n", received_message);
         }
     }
