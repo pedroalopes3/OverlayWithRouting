@@ -59,6 +59,7 @@ void route(node_s *node, const char *received_message, int id)
             {
                 node->dist[atoi(dest)] = atoi(n) + 1;
                 node->succ[atoi(dest)] = id;
+                node->state[atoi(dest)] = 0; // passar para estado de encaminhamento
             }
 
             if (node->state[atoi(dest)] == 0)
@@ -174,53 +175,42 @@ void coord(node_s *node, int id, char *received_message)
 
     if (sscanf(received_message, "%49s %49s", cmd, dest) == 2)
     {
+        int d = atoi(dest); 
 
-        if (node->state[atoi(dest)] == 1)
+        if (node->state[d] == 1)
         {
-            char uncoord_message[256] = {0};
-            strcat(uncoord_message, "UNCOORD ");
-            strcat(uncoord_message, dest);
-            strcat(uncoord_message, "\n");
+            char uncoord_message[128];
+            sprintf(uncoord_message, "UNCOORD %d\n", d);
             send_message_tcp(node->neighbors[id]->tcp_socket, uncoord_message);
         }
-        else if (node->state[atoi(dest)] == 0 && id != node->succ[atoi(dest)])
+        else if (node->state[d] == 0 && id != node->succ[d])
         {
-            char route_message[256] = {0};
-            strcat(route_message, "ROUTE ");
-            strcat(route_message, dest);
-            strcat(route_message, " ");
-            char dist_str[50];
-            sprintf(dist_str, "%d", node->dist[atoi(dest)]);
-            strcat(route_message, dist_str);
-            strcat(route_message, "\n");
-            send_message_tcp(node->neighbors[id]->tcp_socket, route_message);
-
-            char uncoord_message[256] = {0};
-            strcat(uncoord_message, "UNCOORD ");
-            strcat(uncoord_message, dest);
-            strcat(uncoord_message, "\n");
+            char uncoord_message[128];
+            sprintf(uncoord_message, "UNCOORD %d\n", d);
             send_message_tcp(node->neighbors[id]->tcp_socket, uncoord_message);
-        }
-        else if (node->state[atoi(dest)] == 0 && id == node->succ[atoi(dest)])
-        {
-            node->state[atoi(dest)] = 1;
-            node->succ_coord[atoi(dest)] = node->succ[atoi(dest)];
-            node->dist[atoi(dest)] = -1;
-            node->succ[atoi(dest)] = -1;
 
-            int neighbors_seen = 0;
-            for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
+            if (node->dist[d] != -1) 
+            {
+                char route_message[128];
+                sprintf(route_message, "ROUTE %d %d\n", d, node->dist[d]);
+                send_message_tcp(node->neighbors[id]->tcp_socket, route_message);
+            }
+        }
+        else if (node->state[d] == 0 && id == node->succ[d])
+        {
+            node->state[d] = 1;
+            node->succ_coord[d] = node->succ[d];
+            node->dist[d] = -1;
+            node->succ[d] = -1;
+
+            for (int i = 0; i < 100; i++) 
             {
                 if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
                 {
-                    neighbors_seen++;
-                    node->coord[atoi(dest)][i] = 1;
-                    char coord_message[256] = {0};
-                    strcat(coord_message, "COORD ");
-                    char dest_str[50];
-                    sprintf(dest_str, "%d", atoi(dest));
-                    strcat(coord_message, dest_str);
-                    strcat(coord_message, "\n");
+                    node->coord[d][i] = 1; 
+                    
+                    char coord_message[128];
+                    sprintf(coord_message, "COORD %d\n", d);
                     send_message_tcp(node->neighbors[i]->tcp_socket, coord_message);
                 }
             }

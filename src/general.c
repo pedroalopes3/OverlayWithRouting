@@ -45,6 +45,16 @@ void process_stdin_message(const char *message, node_s *node)
         }
         else if ((strcmp(first_word, "leave") == 0) || (strcmp(first_word, "l") == 0))
         {
+            close_tcp_connection(node->tcp_connected_socket);
+            node->tcp_connected_socket = -1;
+            close_tcp_connection(node->tcp_listening_socket);
+            node->tcp_listening_socket = -1;
+            for (int i = 0; i < 100; i++)
+            {
+                node->dist[i] = -1;
+                node->succ[i] = -1;
+                node->state[i] = 1; // passar para estado de coordenacao
+            }
             int neighbors_seen = 0;
             for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
             {
@@ -60,12 +70,27 @@ void process_stdin_message(const char *message, node_s *node)
         {
             if (node->joined)
             {
+
+                close_tcp_connection(node->tcp_connected_socket);
+                node->tcp_connected_socket = -1;
+                close_tcp_connection(node->tcp_listening_socket);
+                node->tcp_listening_socket = -1;
+                for (int i = 0; i < 100; i++)
+                {
+                    node->dist[i] = -1;
+                    node->succ[i] = -1;
+                    node->state[i] = 1; // passar para estado de coordenacao
+                }
                 int neighbors_seen = 0;
                 for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
                 {
                     if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
                     {
                         neighbors_seen++;
+                        // eliminar vizinho do protocolo de encaminhamento
+                        node->dist[i] = -1;
+                        node->succ[i] = -1;
+                        node->state[i] = 1; // passar para estado de coordenacao
                         remove_edge(node, i);
                     }
                 }
@@ -88,6 +113,10 @@ void process_stdin_message(const char *message, node_s *node)
 
             if (sscanf(message, "%49s %49s %49s", cmd, cmd2, id) == 3)
             {
+                // remover do encaminhamento e depois fechar a conexão TCP
+                node->dist[atoi(id)] = -1;
+                node->succ[atoi(id)] = -1;
+                node->state[atoi(id)] = 1; // passar para estado de coordenacao
                 remove_edge(node, atoi(id));
             }
         }
@@ -183,11 +212,11 @@ void process_tcp_connection_message(node_s *node, int id)
             {
                 chat(node, received_message, id);
             }
-            else if(strcmp(first_word, "COORD") == 0)
+            else if (strcmp(first_word, "COORD") == 0)
             {
                 coord(node, id, received_message);
             }
-            else if(strcmp(first_word, "UNCOORD") == 0)
+            else if (strcmp(first_word, "UNCOORD") == 0)
             {
                 uncoord(node, id, received_message);
             }
@@ -218,7 +247,6 @@ void process_tcp_connection_message(node_s *node, int id)
             node->neighbors[id] = NULL;
 
             coordenation_after_loss(node, id);
-
         }
     }
 }

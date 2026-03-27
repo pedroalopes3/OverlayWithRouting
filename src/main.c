@@ -24,12 +24,12 @@ int calc_maxfd(node_s *node)
     {
         maxfd = node->udp_socket;
 
-        if (node->tcp_listening_socket > maxfd)
+        if (node->tcp_listening_socket > maxfd && node->tcp_listening_socket > 0)
         {
             maxfd = node->tcp_listening_socket;
         }
 
-        if (node->tcp_connected_socket > maxfd)
+        if (node->tcp_connected_socket > maxfd && node->tcp_connected_socket > 0)
         {
             maxfd = node->tcp_connected_socket;
         }
@@ -40,7 +40,7 @@ int calc_maxfd(node_s *node)
             if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
             {
                 neighbors_seen++;
-                if (node->neighbors[i]->tcp_socket > maxfd)
+                if (node->neighbors[i]->tcp_socket > maxfd && node->neighbors[i]->tcp_socket > 0)
                 {
                     maxfd = node->neighbors[i]->tcp_socket;
                 }
@@ -49,7 +49,6 @@ int calc_maxfd(node_s *node)
     }
     return maxfd;
 }
-
 
 void node_state(node_s *node) // para debug no desenvolvimento
 {
@@ -148,16 +147,25 @@ int main(int argc, char *argv[])
 
         if (my_node->left)
         {
-            my_node->exiting = true;
+            running = false;
             continue;
         }
 
-        int maxfd = calc_maxfd(my_node);              /* fd é o maior dos descritores a monitorizar, dado que o descritor do stdin é 0 (menor que fd) */
-        FD_ZERO(&rfds);                               /* remover todos os descritores do conjunto */
-        FD_SET(0, &rfds);                             /* adicionar o descritor 0 (stdin) ao conjunto */
-        FD_SET(my_node->udp_socket, &rfds);           /* adicionar o descritor do socket udp ao conjunto */
-        FD_SET(my_node->tcp_listening_socket, &rfds); /* adicionar o descritor do socket server tcp ao conjunto */
-        FD_SET(my_node->tcp_connected_socket, &rfds); /* adicionar o descritor do socket tcp de conexão temporária ao conjunto */
+        int maxfd = calc_maxfd(my_node); /* fd é o maior dos descritores a monitorizar, dado que o descritor do stdin é 0 (menor que fd) */
+        FD_ZERO(&rfds);                  /* remover todos os descritores do conjunto */
+        FD_SET(0, &rfds);                /* adicionar o descritor 0 (stdin) ao conjunto */
+        if (my_node->udp_socket > 0)
+        {
+            FD_SET(my_node->udp_socket, &rfds); /* adicionar o descritor do socket udp ao conjunto */
+        } 
+        if (my_node->tcp_listening_socket > 0)
+        {
+            FD_SET(my_node->tcp_listening_socket, &rfds); /* adicionar o descritor do socket server tcp ao conjunto */
+        }
+        if (my_node->tcp_connected_socket > 0)
+        {
+            FD_SET(my_node->tcp_connected_socket, &rfds); /* adicionar o descritor do socket tcp de conexão temporária ao conjunto */
+        }
         for (int i = 0; i < 100; i++)
         {
             if (my_node->is_a_connected_neighbor[i] && my_node->neighbors[i] != NULL)
@@ -213,6 +221,7 @@ int main(int argc, char *argv[])
         {
             printf("Exiting program...\n");
             running = false;
+            continue;
         }
     }
 
