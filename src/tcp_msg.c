@@ -49,7 +49,7 @@ void route(node_s *node, const char *received_message, int id)
 
     if (sscanf(received_message, "%49s %49s %49s", cmd, dest, n) == 3)
     {
-        if ((atoi(n) + 1) < node->dist[atoi(dest)] || (node->dist[atoi(dest)] == -1))
+        if ((atoi(n) + 1) <= node->dist[atoi(dest)] || (node->dist[atoi(dest)] == -1))
         {
             if (atoi(dest) == atoi(node->id))
             {
@@ -144,7 +144,7 @@ void coordenation_after_loss(node_s *node, int id)
         if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
         {
             neighbors_seen++;
-            coord[id][i] = 1;
+            node->coord[id][i] = 1;
             char coord_message[256] = {0};
             strcat(coord_message, "COORD ");
             char id_str[50];
@@ -156,7 +156,149 @@ void coordenation_after_loss(node_s *node, int id)
     }
 }
 
+// Receção de uma mensagem tipo coordenação
+// COORD dest<LF>
+// Um nó informa um vizinho de que entrou no estado de coordenação relativamente
+// ao destino dest.
+// Suponha que o nó recebe do vizinho 𝑗 a mensagem (𝑐𝑜𝑜𝑟𝑑, 𝑡).
+// 1. Se 𝑠𝑡𝑎𝑡𝑒[𝑡] = 1, então envia (uncoord, 𝑡) a 𝑗.
+// 2. Se 𝑠𝑡𝑎𝑡𝑒[𝑡] = 0 e 𝑗 ≠ 𝑠𝑢𝑐𝑐[𝑡], então envia (𝑟𝑜𝑢𝑡𝑒, 𝑡, 𝑑𝑖𝑠𝑡) e (uncoord, 𝑡) a 𝑗.
+// 3. Se 𝑠𝑡𝑎𝑡𝑒[𝑡] = 0 e 𝑗 = 𝑠𝑢𝑐𝑐[𝑡], então 𝑠𝑡𝑎𝑡𝑒[𝑡] : = 1; 𝑠𝑢𝑐𝑐_𝑐𝑜𝑜𝑟𝑑[𝑡] ∶=
+// 𝑠𝑢𝑐𝑐[𝑡]; 𝑑𝑖𝑠𝑡[𝑡] ∶= ∞; 𝑠𝑢𝑐𝑐[𝑡] ≔ −1. Adicionalmente, para todo o vizinho 𝑘,
+// envia (𝑐𝑜𝑜𝑟𝑑, 𝑡) a 𝑘 e 𝑐𝑜𝑜𝑟𝑑[𝑡, 𝑘] ≔ 1.
+
 void coord(node_s *node, int id, char *received_message)
 {
+    char cmd[50] = {0};
+    char dest[50] = {0};
 
+    if (sscanf(received_message, "%49s %49s", cmd, dest) == 2)
+    {
+
+        if (node->state[atoi(dest)] == 1)
+        {
+            char uncoord_message[256] = {0};
+            strcat(uncoord_message, "UNCOORD ");
+            strcat(uncoord_message, dest);
+            strcat(uncoord_message, "\n");
+            send_message_tcp(node->neighbors[id]->tcp_socket, uncoord_message);
+        }
+        else if (node->state[atoi(dest)] == 0 && id != node->succ[atoi(dest)])
+        {
+            char route_message[256] = {0};
+            strcat(route_message, "ROUTE ");
+            strcat(route_message, dest);
+            strcat(route_message, " ");
+            char dist_str[50];
+            sprintf(dist_str, "%d", node->dist[atoi(dest)]);
+            strcat(route_message, dist_str);
+            strcat(route_message, "\n");
+            send_message_tcp(node->neighbors[id]->tcp_socket, route_message);
+
+            char uncoord_message[256] = {0};
+            strcat(uncoord_message, "UNCOORD ");
+            strcat(uncoord_message, dest);
+            strcat(uncoord_message, "\n");
+            send_message_tcp(node->neighbors[id]->tcp_socket, uncoord_message);
+        }
+        else if (node->state[atoi(dest)] == 0 && id == node->succ[atoi(dest)])
+        {
+            node->state[atoi(dest)] = 1;
+            node->succ_coord[atoi(dest)] = node->succ[atoi(dest)];
+            node->dist[atoi(dest)] = -1;
+            node->succ[atoi(dest)] = -1;
+
+            int neighbors_seen = 0;
+            for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
+            {
+                if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
+                {
+                    neighbors_seen++;
+                    node->coord[atoi(dest)][i] = 1;
+                    char coord_message[256] = {0};
+                    strcat(coord_message, "COORD ");
+                    char dest_str[50];
+                    sprintf(dest_str, "%d", atoi(dest));
+                    strcat(coord_message, dest_str);
+                    strcat(coord_message, "\n");
+                    send_message_tcp(node->neighbors[i]->tcp_socket, coord_message);
+                }
+            }
+        }
+    }
+}
+
+// UNCOORD dest<LF>
+// Um nó informa um vizinho que previamente lhe enviou uma mensagem de
+// coordenação de que não depende desse vizinho para alcançar o destino dest.
+// Receção de uma mensagem tipo expedição
+// Suponha que o nó recebe do seu vizinho 𝑗 a mensagem (uncoord, 𝑡).
+// 1. Se 𝑠𝑡𝑎𝑡𝑒[𝑡] = 1, então 𝑐𝑜𝑜𝑟𝑑[𝑡, 𝑗] ∶= 0.
+// 2. Se 𝑐𝑜𝑜𝑟𝑑[𝑡, 𝑘] = 0 para todo o vizinho 𝑘, então 𝑠𝑡𝑎𝑡𝑒[𝑡] ∶= 0. Se 𝑑𝑖𝑠𝑡[𝑡] ≠ ∞,
+// então envia (𝑟𝑜𝑢𝑡𝑒, 𝑡, 𝑑𝑖𝑠𝑡) a todos vizinhos. Se 𝑠𝑢𝑐𝑐_𝑐𝑜𝑜𝑟𝑑[𝑡] ≠ −1, então
+// envia (uncoord, 𝑡) a 𝑠𝑢𝑐𝑐_𝑐𝑜𝑜𝑟𝑑[𝑡].
+
+void uncoord(node_s *node, int id, char *received_message) // verificar
+{
+    char cmd[50] = {0};
+    char dest[50] = {0};
+
+    if (sscanf(received_message, "%49s %49s", cmd, dest) == 2)
+    {
+        if (node->state[atoi(dest)] == 1)
+        {
+            node->coord[atoi(dest)][id] = 0;
+
+            bool all_uncoord = true;
+            int neighbors_seen = 0;
+            for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
+            {
+                if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
+                {
+                    neighbors_seen++;
+                    if (node->coord[atoi(dest)][i] == 0)
+                    {
+                        all_uncoord = false;
+                        break;
+                    }
+                }
+            }
+
+            if (all_uncoord)
+            {
+                node->state[atoi(dest)] = 0;
+
+                if (node->dist[atoi(dest)] != -1)
+                {
+                    char route_message[256] = {0};
+                    strcat(route_message, "ROUTE ");
+                    strcat(route_message, dest);
+                    strcat(route_message, " ");
+                    char dist_str[50];
+                    sprintf(dist_str, "%d", node->dist[atoi(dest)]);
+                    strcat(route_message, dist_str);
+                    strcat(route_message, "\n");
+
+                    int neighbors_seen = 0;
+                    for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
+                    {
+                        if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
+                        {
+                            neighbors_seen++;
+                            send_message_tcp(node->neighbors[i]->tcp_socket, route_message);
+                        }
+                    }
+                }
+
+                if (node->succ_coord[atoi(dest)] != -1)
+                {
+                    char uncoord_message[256] = {0};
+                    strcat(uncoord_message, "UNCOORD ");
+                    strcat(uncoord_message, dest);
+                    strcat(uncoord_message, "\n");
+                    send_message_tcp(node->neighbors[node->succ_coord[atoi(dest)]]->tcp_socket, uncoord_message);
+                }
+            }
+        }
+    }
 }

@@ -109,7 +109,6 @@ void show_neighbors(node_s *node)
 
 void remove_edge(node_s *node, int id)
 {
-
     close_tcp_connection(node->neighbors[id]->tcp_socket);
     free_neighbor(node->neighbors[id]);
     node->neighbors[id] = NULL;

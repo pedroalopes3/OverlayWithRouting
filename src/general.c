@@ -183,6 +183,14 @@ void process_tcp_connection_message(node_s *node, int id)
             {
                 chat(node, received_message, id);
             }
+            else if(strcmp(first_word, "COORD") == 0)
+            {
+                coord(node, id, received_message);
+            }
+            else if(strcmp(first_word, "UNCOORD") == 0)
+            {
+                uncoord(node, id, received_message);
+            }
             else
             {
                 printf("Received unknown message type: %s\n", first_word);

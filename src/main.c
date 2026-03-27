@@ -34,10 +34,12 @@ int calc_maxfd(node_s *node)
             maxfd = node->tcp_connected_socket;
         }
 
-        for (int i = 0; i < 100; i++)
+        int neighbors_seen = 0;
+        for (int i = 0; i < 100 && neighbors_seen <= node->n_neighbors; i++)
         {
             if (node->is_a_connected_neighbor[i] && node->neighbors[i] != NULL)
             {
+                neighbors_seen++;
                 if (node->neighbors[i]->tcp_socket > maxfd)
                 {
                     maxfd = node->neighbors[i]->tcp_socket;
@@ -147,6 +149,7 @@ int main(int argc, char *argv[])
         if (my_node->left)
         {
             my_node->exiting = true;
+            continue;
         }
 
         int maxfd = calc_maxfd(my_node);              /* fd é o maior dos descritores a monitorizar, dado que o descritor do stdin é 0 (menor que fd) */
